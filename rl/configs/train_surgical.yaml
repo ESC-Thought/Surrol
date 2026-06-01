@@ -1,0 +1,20 @@
+defaults:
+  - residual_policy_arch: surgical_vision
+
+# Data paths
+data_dir: "/home/kejianshi/Desktop/Surgical_Robot/Surrol_Related/IROS_SurRoL/rl/act-main-3/experiments/eval/whole_policy/0625-stereo-200_correction/correction_data"
+exp_root_dir: "experiments/residual_policy"
+
+# Training params
+seed: 42
+gpus: 1
+lr: 1e-4
+wd: 1e-4
+bs: 32
+vbs: 32
+eval_interval: 1
+
+# Wandb config
+use_wandb: true
+wandb_project: "surgical_residual_policy"
+wandb_run_name: ${run_name} 

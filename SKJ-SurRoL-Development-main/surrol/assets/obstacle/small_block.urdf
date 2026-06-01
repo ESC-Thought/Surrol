@@ -1,0 +1,58 @@
+<?xml version="1.0" ?>
+<robot name="thin_wall">
+    <!-- 定义墙壁的颜色 -->
+    <material name="blue">
+        <color rgba="0.6 0.8 0.1 1"/>
+    </material>
+
+    <!-- 主要的墙壁部分 -->
+    <link name="baseLink">
+        <!-- 物理接触参数 -->
+        <contact>
+            <lateral_friction value="1.0"/>
+            <rolling_friction value="0.0"/>
+            <contact_cfm value="0.0"/>
+            <contact_erp value="1.0"/>
+        </contact>
+
+        <!-- 质量 & 惯性 -->
+        <inertial>
+            <origin rpy="0 0 0" xyz="0 0 0"/>
+            <mass value="0.2"/> <!-- 质量较轻 -->
+            <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
+        </inertial>
+
+        <!-- 视觉模型 -->
+        <visual>
+            <origin rpy="0 0 1.5708" xyz="0 0 0"/>
+            <geometry>
+                <box size="0.0065 0.0065 0.0065"/> <!-- 厚0.01m，宽0.05m，高0.05m -->
+            </geometry>
+            <material name="gray"/>
+        </visual>
+
+        <!-- 碰撞模型 -->
+        <collision>
+            <origin rpy="0 0 1.5708" xyz="0 0 0"/>
+            <geometry>
+                <box size="0.0065 0.0065 0.0065"/>
+            </geometry>
+        </collision>
+    </link>
+
+    <!-- 墙壁顶部的 Waypoint -->
+    <link name="waypoint_top">
+        <inertial>
+            <origin rpy="0 0 0" xyz="0 0 0"/>
+            <mass value="0"/>
+            <inertia ixx="0." ixy="0" ixz="0" iyy="0." iyz="0" izz="0."/>
+        </inertial>
+    </link>
+
+    <joint name="waypoint_joint_top" type="fixed">
+        <parent link="baseLink"/>
+        <child link="waypoint_top"/>
+        <origin rpy="0 0 0" xyz="0 0 0.05"/> <!-- Waypoint 设置在墙顶 -->
+    </joint>
+
+</robot>

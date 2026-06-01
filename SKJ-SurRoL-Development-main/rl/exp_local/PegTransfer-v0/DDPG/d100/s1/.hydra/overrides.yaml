@@ -1,0 +1,3 @@
+- task=PegTransfer-v0
+- agent=ddpg
+- use_wb=True
