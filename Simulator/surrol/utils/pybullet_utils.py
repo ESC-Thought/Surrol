@@ -2,6 +2,7 @@
 This file is modified from
 https://github.com/columbia-robovision/decentralized-multiarm/blob/main/environment/rrt/pybullet_utils.py
 """
+import os
 import time
 import numpy as np
 import pybullet as p
@@ -845,14 +846,26 @@ def get_camera():
     return CameraInfo(*p.getDebugVisualizerCamera())
 
 
+def get_render_backend():
+    renderer = os.environ.get("SURROL_RENDERER", "").lower()
+    if renderer in ("tiny", "cpu", "software"):
+        return p.ER_TINY_RENDERER
+    if renderer in ("hardware", "opengl", "egl"):
+        return p.ER_BULLET_HARDWARE_OPENGL
+
+    use_egl = os.environ.get("SURROL_USE_EGL", "0").lower() in ("1", "true", "yes", "on")
+    return p.ER_BULLET_HARDWARE_OPENGL if use_egl else p.ER_TINY_RENDERER
+
+
 def render_image(width, height, view_matrix, proj_matrix, shadow=1, stereo=False, scaling=None):
+    renderer = get_render_backend()
     (_, _, px, depth, mask) = p.getCameraImage(width=width,
                                            height=height,
                                            viewMatrix=view_matrix,
                                            projectionMatrix=proj_matrix,
                                            shadow=shadow,
                                            lightDirection=(10, 0, 10),
-                                           renderer=p.ER_BULLET_HARDWARE_OPENGL)
+                                           renderer=renderer)
     rgb_array = np.array(px, dtype=np.uint8)
     rgb_array = np.reshape(rgb_array, (height, width, 4))
 
@@ -882,7 +895,7 @@ def render_image(width, height, view_matrix, proj_matrix, shadow=1, stereo=False
                                             projectionMatrix=proj_matrix,
                                             shadow=shadow,
                                             lightDirection=(10, 0, 10),
-                                            renderer=p.ER_BULLET_HARDWARE_OPENGL)
+                                            renderer=renderer)
 
         rgb_array2 = np.array(px2, dtype=np.uint8)
         rgb_array2 = np.reshape(rgb_array2, (height, width, 4))

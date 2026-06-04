@@ -4,10 +4,12 @@ Refer to
 https://github.com/openai/baselines/blob/master/baselines/her/experiment/data_generation/fetch_data_generation.py
 """
 import os
+import sys
 # software render mode
 os.environ['PYBULLET_EGL_DEVICE'] = '-1'
 os.environ['GALLIUM_DRIVER'] = 'llvmpipe'
 os.environ['MESA_GL_VERSION_OVERRIDE'] = '3.3'
+sys.path.insert(0, '/home/escthought/Surrol/Simulator')
 import argparse
 import gym
 import time
@@ -66,7 +68,7 @@ class Data():
         # save_path = f'/home/ubuntu/SurRoL/SurRoL_Mygit/IROS_SurRoL/surrol/data/image_action_qpos_{self.episode_idx}.pkl'
         # save_path = f'/home/kejianshi/Desktop/Surgical_Robot/Surrol_Related/IROS_SurRoL/collected_data/bipeg/image_action_qpos_{episode_idx}.pkl'
         # save_path = f'/research/d1/gds/kjshi/IROS_SurRoL/data_collected/bi_peg/image_action_qpos_{episode_idx}.pkl'
-        save_path = f'/home/escthought/CSCI4998/collected_data/bipeg_transfer/image_action_qpos_{episode_idx}.pkl'
+        save_path = f'/home/escthought/Surrol/collected_data/bipeg_transfer/image_action_qpos_{episode_idx}.pkl'
         with open(save_path, 'wb') as f:
             pickle.dump(data, f)
 

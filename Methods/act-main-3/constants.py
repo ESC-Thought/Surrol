@@ -5,7 +5,7 @@ import pathlib
 # DATA_DIR = '/home/ubuntu/SurRoL/SurRoL_Mygit/IROS_SurRoL/rl/act-main-3/data/1219exp3-1'
 # DATA_DIR = '/root/autodl-tmp/IROS_SurRoL/rl/act-main-3/data/1222exp3-2'
 # DATA_DIR = '/home/skylar/SurRoL/IROS_SurRoL/rl/act-main-3/data/0117-needle-avg'   # TODO-PRE
-DATA_DIR = '/home/escthought/CSCI4998/collected_data/bipeg_transfer'   # TODO-PRE
+DATA_DIR = '/home/escthought/Surrol/collected_data/bipeg_transfer'   # TODO-PRE
 # DATA_DIR = '/research/d1/gds/kjshi/IROS_SurRoL/data_collected/bi_peg' 
 
 SIM_TASK_CONFIGS = {

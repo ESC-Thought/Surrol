@@ -50,11 +50,14 @@ class SurRoLEnv(gym.Env):
             else:
                 self.cid = cid
             self.action_mode = action_mode            
-            # See PyBullet Quickstart Guide Synthetic Camera Rendering
-            # TODO: no light when using direct without egl
-            if socket.gethostname().startswith('pc') or True:
-                # TODO: not able to run on remote server
+            # See PyBullet Quickstart Guide Synthetic Camera Rendering.
+            # Load EGL only when explicitly requested; some headless machines
+            # fail at reset if the plugin is forced in DIRECT mode.
+            use_egl = os.environ.get("SURROL_USE_EGL", "0").lower() in ("1", "true", "yes", "on")
+            if use_egl:
                 egl = pkgutil.get_loader('eglRenderer')
+                if egl is None:
+                    raise RuntimeError("SURROL_USE_EGL=1 but PyBullet eglRenderer plugin was not found.")
                 plugin = p.loadPlugin(egl.get_filename(), "_eglRendererPlugin")
         # camera related setting
         self._view_matrix = p.computeViewMatrixFromYawPitchRoll(cameraTargetPosition=(0, 0, 0.2),

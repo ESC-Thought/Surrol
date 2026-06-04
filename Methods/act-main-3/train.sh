@@ -1,13 +1,13 @@
 #! /bin/bash
 export CUDA_VISIBLE_DEVICES=0
-export PYTHONPATH=/home/escthought/CSCI4998
+export PYTHONPATH=/home/escthought/Surrol
 
 # Get the current date and time
 task_name=${1:-bi_peg_transfer}
 datetime=$(date +"%Y%m%d_%H%M")_${task_name}
 # datetime="20250215_2011_bi_peg_transfer"
 
-output_root="/home/escthought/CSCI4998/Methods/act-main-3/experiments/"
+output_root="/home/escthought/Surrol/Methods/act-main-3/experiments/"
 # output_root="/home/skylar/SurRoL/IROS_SurRoL/rl/act-main-3/experiments/"
 # Create an output folder using the datetimed
 
@@ -43,7 +43,7 @@ command="python3 imitate_episodes_.py \
 
 if [[ "$2" == "eval" ]]; then
     command+=" --eval"    
-    output_folder="${output_root}20260521_1633_bi_peg_transfer_200_rgb1_top"
+    output_folder="${output_root}20260603_0151_bi_peg_transfer_200_rgb1_top"
 else
     output_folder="${output_root}${datetime}_200_rgb1_top"
     mkdir -p "$output_folder"
