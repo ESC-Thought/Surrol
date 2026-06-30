@@ -152,6 +152,7 @@ class Arm(object):
         :param abs_input: the absolute translation you want to make (in joint space).
         :return: whether or not able to reach the given input.
         """
+        abs_input = self._clip_joint_limits(abs_input)
         # 检查关节是否超出限制
         # sky
         if not self._check_joint_limits(abs_input):
@@ -270,6 +271,7 @@ class Arm(object):
         Helper function for PyBullet initial reset.
         Not recommend to use during simulation.
         """
+        abs_input = self._clip_joint_limits(abs_input)
         if not self._check_joint_limits(abs_input):
             return
         joint_positions = self._get_joint_positions_all(abs_input)
@@ -326,6 +328,14 @@ class Arm(object):
             # print("Upper limits:", self.limits['upper'][:self.DoF])
             return False
         return True
+
+    def _clip_joint_limits(self, abs_input: [list, np.ndarray]) -> np.ndarray:
+        """Clip joint targets to the valid robot limits before sending them to PyBullet."""
+        abs_input = np.asarray(abs_input, dtype=np.float64).copy()
+        assert len(abs_input) == self.DoF, "The number of joints should match the arm DoF."
+        lower = self.limits['lower'][:self.DoF]
+        upper = self.limits['upper'][:self.DoF]
+        return np.clip(abs_input, lower, upper)
 
     def _get_joint_positions_all(self, abs_input: [list, np.ndarray]):
         """ With the consideration of parallel mechanism constraints and other redundant joints.

@@ -18,7 +18,7 @@ collected_data pickle demos
 
 - 原始演示数据：`collected_data/bipeg_transfer/image_action_qpos_*.pkl`
 - 点云转换器：`Methods/dp3-surrol/convert_bipegtransfer_pickles.py`
-- 转换后数据：`collected_data/bipeg_transfer_dp3_pointcloud.npz`
+- 转换后数据：`collected_data/bipeg_transfer_dp3_global_fixedpeg_xyjitter_pointcloud.npz`
 - 外层 batch 检查器：`Methods/dp3-surrol/inspect_dataset_batch.py`
 - 外层 dataset 草稿：`Methods/dp3-surrol/surrol_bipeg_dataset.py`
 - DP3 原仓库：`Methods/dp3-surrol/3D-Diffusion-Policy/3D-Diffusion-Policy`
@@ -74,7 +74,7 @@ Methods/dp3-surrol/3D-Diffusion-Policy/3D-Diffusion-Policy/data/outputs/
 ```bash
 python3 Methods/dp3-surrol/convert_bipegtransfer_pickles.py \
   --input-dir collected_data/bipeg_transfer \
-  --output collected_data/bipeg_transfer_dp3_pointcloud.npz \
+  --output collected_data/bipeg_transfer_dp3_global_fixedpeg_xyjitter_pointcloud.npz \
   --num-points 1024 \
   --mask-mode target \
   --action-mode absolute
@@ -113,7 +113,7 @@ Methods/dp3-surrol/3D-Diffusion-Policy/3D-Diffusion-Policy/
 DP3 内部 dataset 应该：
 
 - 继承 `diffusion_policy_3d.dataset.base_dataset.BaseDataset`。
-- 读取 `collected_data/bipeg_transfer_dp3_pointcloud.npz`。
+- 读取 `collected_data/bipeg_transfer_dp3_global_fixedpeg_xyjitter_pointcloud.npz`。
 - 按 episode-level split 划分 train/val，避免同一条 demo 泄漏到 train 和 val。
 - 返回 DP3 horizon 窗口：
   - `obs.point_cloud`: `(horizon, 1024, 3)`
@@ -151,7 +151,7 @@ shape_meta:
 
 dataset:
   _target_: diffusion_policy_3d.dataset.surrol_bipeg_dataset.SurrolBipegDataset
-  npz_path: collected_data/bipeg_transfer_dp3_pointcloud.npz
+  npz_path: collected_data/bipeg_transfer_dp3_global_fixedpeg_xyjitter_pointcloud.npz
   horizon: ${horizon}
   pad_before: ${eval:'${n_obs_steps}-1'}
   pad_after: ${eval:'${n_action_steps}-1'}

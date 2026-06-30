@@ -20,8 +20,9 @@ import numpy as np
 
 SCRIPT_PATH = Path(__file__).resolve()
 REPO_ROOT = SCRIPT_PATH.parents[2]
-DEFAULT_INPUT_PATH = REPO_ROOT / "collected_data/bipeg_transfer_dp3_pointcloud.npz"
-DEFAULT_OUTPUT_PATH = REPO_ROOT / "collected_data/bipeg_transfer_dp3_pointcloud_preview.png"
+DEFAULT_NUM_POINTS = 1024
+DEFAULT_INPUT_PATH = REPO_ROOT / "collected_data/bipeg_transfer_dp3_global_fixedpeg_xyjitter_pointcloud.npz"
+DEFAULT_OUTPUT_PATH = REPO_ROOT / "collected_data/bipeg_transfer_dp3_global_fixedpeg_xyjitter_pointcloud_preview.png"
 
 
 def parse_args() -> argparse.Namespace:
@@ -31,7 +32,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--episode", type=int, default=0)
     parser.add_argument("--frames", default=None, help="Comma-separated frame ids inside the selected episode.")
     parser.add_argument("--num-frames", type=int, default=5)
-    parser.add_argument("--max-points", type=int, default=1024)
+    parser.add_argument("--max-points", type=int, default=DEFAULT_NUM_POINTS)
     parser.add_argument("--point-size", type=float, default=2.0)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--use-rgb", action="store_true")

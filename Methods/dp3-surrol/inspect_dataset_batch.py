@@ -10,7 +10,7 @@ from typing import Mapping
 import torch
 from torch.utils.data import DataLoader
 
-from surrol_bipeg_dataset import DEFAULT_DATA_PATH, SurrolBipegSequenceDataset, make_train_val_datasets
+from surrol_bipeg_dataset import DEFAULT_DATA_PATH, DEFAULT_NUM_POINTS, SurrolBipegSequenceDataset, make_train_val_datasets
 
 
 def parse_args() -> argparse.Namespace:
@@ -26,6 +26,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--normalize", action="store_true")
     parser.add_argument("--include-rgb", action="store_true")
+    parser.add_argument("--num-points", type=int, default=DEFAULT_NUM_POINTS)
     return parser.parse_args()
 
 
@@ -93,6 +94,7 @@ def main() -> None:
             normalize=args.normalize,
             include_rgb=args.include_rgb,
             return_info=True,
+            num_points=args.num_points,
         )
         if args.split in ("train", "both"):
             inspect_dataset("train", train_dataset, args)
@@ -110,6 +112,7 @@ def main() -> None:
             normalize=args.normalize,
             include_rgb=args.include_rgb,
             return_info=True,
+            num_points=args.num_points,
         )
         inspect_dataset("all", dataset, args)
 

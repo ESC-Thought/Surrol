@@ -24,7 +24,7 @@ from Simulator.surrol.utils.pybullet_utils import (
 # Rendering width and height
 RENDER_HEIGHT = 256
 RENDER_WIDTH = 256
-FoV = 60
+RENDER_FOV = 60
 
 LINKS = (
     'ecm_base_link', 'ecm_yaw_link', 'ecm_pitch_end_link',  # -1, 0, 1
@@ -155,7 +155,8 @@ class Ecm(Arm):
         # print(" -> cVc: {}, q: {}, dq: {}".format(list(np.round(cVc.flatten(), 4)), q, list(dq.flatten())))
         return dq.flatten()
 
-    def render_image(self, width=RENDER_WIDTH, height=RENDER_HEIGHT, stereo=False, scaling=None):
+    def render_image(self, width=RENDER_WIDTH, height=RENDER_HEIGHT, stereo=False, scaling=None,
+                     segmentation_with_link=False, FoV=RENDER_FOV):
         pos_eef, orn_eef = get_link_pose(self.body, self.EEF_LINK_INDEX)
         pos_tip = get_link_pose(self.body, self.TIP_LINK_INDEX)[0]
         mat_eef = np.array(p.getMatrixFromQuaternion(orn_eef)).reshape((3, 3))
@@ -170,7 +171,8 @@ class Ecm(Arm):
                                                         farVal=10.0)
 
         results = render_image(width, height,
-                                       self.view_matrix, self.proj_matrix, stereo=stereo, scaling=scaling)
+                                       self.view_matrix, self.proj_matrix, stereo=stereo, scaling=scaling,
+                                       segmentation_with_link=segmentation_with_link)
         return results
 
     def get_centroid_proj(self, pos) -> np.ndarray:

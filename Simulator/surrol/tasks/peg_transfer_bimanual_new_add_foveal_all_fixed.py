@@ -5,7 +5,7 @@ import numpy as np
 import pybullet as p
 from Simulator.surrol.tasks.psm_env_rpy import PsmsEnv, goal_distance
 from Simulator.surrol.utils.pybullet_utils import (
-    get_link_pose,
+    get_link_pose, 
     reset_camera, 
     wrap_angle
 )
@@ -18,6 +18,29 @@ from Simulator.surrol.robots.ecm import Ecm
 
 import collections 
 
+BODY_ID_MASK = (1 << 24) - 1
+LINK_ID_SHIFT = 24
+
+
+def _parse_bool(value, default=False):
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in ("1", "true", "yes", "y", "on")
+
+
+def _parse_peg_indices(value, default):
+    if value is None:
+        return tuple(default)
+    if isinstance(value, str):
+        items = [item.strip() for item in value.split(",") if item.strip()]
+    else:
+        items = list(value)
+    parsed = tuple(int(item) for item in items)
+    return parsed if parsed else tuple(default)
+
+
 class BiPegTransfer(PsmsEnv):
     POSE_BOARD = ((0.55, 0, 0.6861), (0, 0, 0))
     POSE_WALL = ((0.55, -0.1, 0.8), (0, 0, 0))
@@ -28,7 +51,36 @@ class BiPegTransfer(PsmsEnv):
     ACTION_ECM_SIZE=3
     #for haptic device demo  
     haptic=True
-    def __init__(self, render_mode=None, cid = -1, action_mode = 'yaw'):
+    DEFAULT_BLOCK_INITIAL_PEGS = (6, 7, 8, 9, 10, 11)
+    DEFAULT_BLOCK_INITIAL_XY_JITTER = 0.001 * SCALING
+
+    def __init__(
+        self,
+        render_mode=None,
+        cid=-1,
+        action_mode='yaw',
+        randomize_block_initial_position=None,
+        block_initial_peg_indices=None,
+        block_initial_xy_jitter=None,
+    ):
+        if randomize_block_initial_position is None:
+            randomize_block_initial_position = _parse_bool(
+                os.environ.get("SURROL_BIPEG_RANDOMIZE_BLOCK_INITIAL_POSITION"),
+                default=False,
+            )
+        self.randomize_block_initial_position = _parse_bool(randomize_block_initial_position, default=False)
+        self.block_initial_peg_indices = _parse_peg_indices(
+            block_initial_peg_indices or os.environ.get("SURROL_BIPEG_BLOCK_INITIAL_PEGS"),
+            self.DEFAULT_BLOCK_INITIAL_PEGS,
+        )
+        if block_initial_xy_jitter is None:
+            block_initial_xy_jitter = os.environ.get(
+                "SURROL_BIPEG_BLOCK_INITIAL_XY_JITTER",
+                self.DEFAULT_BLOCK_INITIAL_XY_JITTER,
+            )
+        self.block_initial_xy_jitter = float(block_initial_xy_jitter)
+        self.block_source_peg_indices = []
+        self.block_initial_xy_offsets = []
         super(BiPegTransfer, self).__init__(render_mode, cid, action_mode)
         print("begin bi-pegtransfer")
         self._view_matrix = p.computeViewMatrixFromYawPitchRoll(
@@ -82,12 +134,31 @@ class BiPegTransfer(PsmsEnv):
 
         # blocks
         num_blocks = 1
-        for i in self._pegs[6: 6 + num_blocks]:
+        self.block_source_peg_indices = []
+        self.block_initial_xy_offsets = []
+        peg_candidates = np.asarray(self.block_initial_peg_indices, dtype=np.int64)
+        if self.randomize_block_initial_position:
+            replace = peg_candidates.size < num_blocks
+            block_source_pegs = np.random.choice(peg_candidates, size=num_blocks, replace=replace)
+        else:
+            block_source_pegs = peg_candidates[:num_blocks]
+        for i in block_source_pegs:
+            i = int(i)
+            self.block_source_peg_indices.append(i)
             pos, orn = get_link_pose(self.obj_ids['fixed'][1], i)
+            xy_offset = np.zeros(2, dtype=np.float32)
+            if self.block_initial_xy_jitter > 0.0:
+                xy_offset = np.random.uniform(
+                    low=-self.block_initial_xy_jitter,
+                    high=self.block_initial_xy_jitter,
+                    size=2,
+                ).astype(np.float32)
+            self.block_initial_xy_offsets.append(xy_offset.copy())
             yaw = (np.random.rand() - 0.5) * np.deg2rad(60)
             # print("abcd:",np.array(pos) + np.array([0, 0, 0.03]))
+            block_pos = np.array(pos) + np.array([xy_offset[0], xy_offset[1], 0.03])
             obj_id = p.loadURDF(os.path.join(ASSET_DIR_PATH, 'block/block.urdf'),
-                                np.array(pos) + np.array([0, 0, 0.03]),
+                                block_pos,
                                 p.getQuaternionFromEuler((0, 0, yaw)),
                                 useFixedBase=False,
                                 globalScaling=self.SCALING)
@@ -118,21 +189,18 @@ class BiPegTransfer(PsmsEnv):
     #     super(BiPegTransfer, self)._set_action(action)
 
     def _is_success(self, achieved_goal, desired_goal):
-        """ Indicates whether or not the achieved goal successfully achieved the desired goal.
-        """
-        # TODO: may need to tune parameters
-        # result = np.logical_and(
-        #     goal_distance(achieved_goal[..., :2], desired_goal[..., :2]) < 5e-3 * self.SCALING,
-        #     np.abs(achieved_goal[..., -1] - desired_goal[..., -1]) < 4e-3 * self.SCALING,
-        # ).astype(np.float32)
-        result = np.logical_and(np.logical_and(
-            goal_distance(achieved_goal[..., :2], desired_goal[..., :2]) < 5e-3 * self.SCALING,
-            np.abs(achieved_goal[..., -1] - desired_goal[..., -1]) < 4e-3 * self.SCALING,
-        ).astype(np.float32), self._waypoints_done[-1] == True)
-        # print("result: ", result)
-        return result
+        """Success means the block is close enough to the target peg."""
+        xy_tolerance = 5e-3 * self.SCALING
+        z_tolerance = 4e-3 * self.SCALING
+        xy_delta = achieved_goal[..., :2] - desired_goal[..., :2]
+        xy_close = (
+            xy_delta[..., 0] * xy_delta[..., 0]
+            + xy_delta[..., 1] * xy_delta[..., 1]
+        ) < xy_tolerance * xy_tolerance
+        z_close = np.abs(achieved_goal[..., -1] - desired_goal[..., -1]) < z_tolerance
+        return np.asarray(xy_close & z_close, dtype=np.float32)
 
-    def _sample_goal(self) -> np.ndarray:
+    def _sample_goal(self) -> np.ndarray:  
         """ Samples a new goal and returns it.
         """
         color = [1, 0, 0, 1]  # Red color with full opacity
@@ -144,7 +212,7 @@ class BiPegTransfer(PsmsEnv):
         """ Define waypoints
         """
         super()._sample_goal_callback()
-        self._waypoints = []  # eleven waypoints
+        self._waypoints = []  # fourteen waypoints
         pos_obj1, orn_obj1 = get_link_pose(self.obj_id, self.obj_link1)
         pos_obj2, orn_obj2 = get_link_pose(self.obj_id, self.obj_link2)
         orn1 = p.getEulerFromQuaternion(orn_obj1)
@@ -166,9 +234,8 @@ class BiPegTransfer(PsmsEnv):
             else wrap_angle(orn2[2] + np.pi)  # minimize the delta yaw
 
         # the corresponding peg position
-        # pos_peg = get_link_pose(self.obj_ids['fixed'][1], self.obj_id - np.min(self._blocks) + 6)[0]  # 6 pegs
-        pos_peg = get_link_pose(self.obj_ids['fixed'][1],
-                                self._pegs[self.obj_id - np.min(self._blocks) + 6])[0]  # 6 pegs
+        source_peg = self.block_source_peg_indices[0] if self.block_source_peg_indices else int(self._pegs[6])
+        pos_peg = get_link_pose(self.obj_ids['fixed'][1], source_peg)[0]
 
         pos_mid1 = [pos_obj1[0],
                     0. + pos_obj1[1] - pos_peg[1], pos_obj1[2] + 0.043 * self.SCALING]  # consider offset
@@ -273,7 +340,18 @@ class BiPegTransfer(PsmsEnv):
         y_pixel = np.clip(y_pixel, 0, height - 1)
         
         return np.array([x_pixel, y_pixel])
-    
+
+    @staticmethod
+    def _decode_segmentation_mask(mask_ori):
+        mask_ori = np.asarray(mask_ori, dtype=np.int64)
+        body_mask = mask_ori.copy()
+        link_mask = np.full(mask_ori.shape, -1, dtype=np.int64)
+
+        encoded_mask = mask_ori >= (1 << LINK_ID_SHIFT)
+        body_mask[encoded_mask] = mask_ori[encoded_mask] & BODY_ID_MASK
+        link_mask[encoded_mask] = (mask_ori[encoded_mask] >> LINK_ID_SHIFT) - 1
+        return body_mask, link_mask
+
     def _get_obs(self) -> dict:
         psm1_state = self._get_robot_state(0)
         psm2_state = self._get_robot_state(1)
@@ -328,8 +406,22 @@ class BiPegTransfer(PsmsEnv):
         #     'desired_goal': self.goal.copy(),
         # }
         # Render the images (using the ECM)
-        output = self.ecm.render_image(stereo=self.STEREO, scaling=self.SCALING)
-        seg = output.mask1
+        output = self.ecm.render_image(
+            stereo=self.STEREO,
+            scaling=self.SCALING,
+            segmentation_with_link=True,
+        )
+        body_mask, link_mask = self._decode_segmentation_mask(output.mask1)
+        peg_board_id = self.obj_ids['fixed'][1]
+        peg_mask = (body_mask == peg_board_id) & (link_mask >= 0)
+        mask_no_arm = np.array(body_mask == self.target_id)
+        mask_target = np.array(
+            (body_mask == self.psm1.body)
+            | (body_mask == self.psm2.body)
+            | peg_mask
+            | (body_mask == self.target_id)
+        )
+        seg = body_mask
         rgb1 = output.rgb1
         depth = output.depth1
 
@@ -351,6 +443,8 @@ class BiPegTransfer(PsmsEnv):
             obs['images']['rgb2']= rgb2
         # sky
         obs['images']['mask'] = seg
+        obs['images']['mask_no_arm'] = mask_no_arm
+        obs['images']['mask_target'] = mask_target
         obs['images']['depth'] = depth
 
         tip1_pos, _ = get_link_pose(self.psm1.body, self.psm1.TIP_LINK_INDEX)
@@ -373,10 +467,22 @@ class BiPegTransfer(PsmsEnv):
         # robot_joint_state = self.psm1.get_current_joint_position() + self.psm2.get_current_joint_position()
         robot_state = np.concatenate([self._get_robot_state(0), self._get_robot_state(1)]) 
         # print("BI ROBOT_STATE: ", robot_state)
-        output = self.ecm.render_image(stereo=self.STEREO, scaling=self.SCALING)
-        mask_ori=output.mask1
-        mask_no_arm = np.array((mask_ori==self.target_id))
-        mask_target = np.array((mask_ori==1)|(mask_ori==4)|(mask_ori==self.target_id))
+        output = self.ecm.render_image(
+            stereo=self.STEREO,
+            scaling=self.SCALING,
+            segmentation_with_link=True,
+        )
+        mask_ori = output.mask1
+        body_mask, link_mask = self._decode_segmentation_mask(mask_ori)
+        peg_board_id = self.obj_ids['fixed'][1]
+        peg_mask = (body_mask == peg_board_id) & (link_mask >= 0)
+        mask_no_arm = np.array(body_mask == self.target_id)
+        mask_target = np.array(
+            (body_mask == self.psm1.body)
+            | (body_mask == self.psm2.body)
+            | peg_mask
+            | (body_mask == self.target_id)
+        )
         rgb1 = output.rgb1
         depth = output.depth1
 

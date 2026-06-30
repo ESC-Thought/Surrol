@@ -857,15 +857,21 @@ def get_render_backend():
     return p.ER_BULLET_HARDWARE_OPENGL if use_egl else p.ER_TINY_RENDERER
 
 
-def render_image(width, height, view_matrix, proj_matrix, shadow=1, stereo=False, scaling=None):
+def render_image(width, height, view_matrix, proj_matrix, shadow=1, stereo=False, scaling=None, segmentation_with_link=False):
     renderer = get_render_backend()
-    (_, _, px, depth, mask) = p.getCameraImage(width=width,
-                                           height=height,
-                                           viewMatrix=view_matrix,
-                                           projectionMatrix=proj_matrix,
-                                           shadow=shadow,
-                                           lightDirection=(10, 0, 10),
-                                           renderer=renderer)
+    camera_kwargs = dict(
+        width=width,
+        height=height,
+        viewMatrix=view_matrix,
+        projectionMatrix=proj_matrix,
+        shadow=shadow,
+        lightDirection=(10, 0, 10),
+        renderer=renderer,
+    )
+    if segmentation_with_link:
+        camera_kwargs["flags"] = p.ER_SEGMENTATION_MASK_OBJECT_AND_LINKINDEX
+
+    (_, _, px, depth, mask) = p.getCameraImage(**camera_kwargs)
     rgb_array = np.array(px, dtype=np.uint8)
     rgb_array = np.reshape(rgb_array, (height, width, 4))
 
@@ -881,6 +887,7 @@ def render_image(width, height, view_matrix, proj_matrix, shadow=1, stereo=False
     
     depth = far * near / (far - (far - near) * depth_buffer)
     #depth=(2.0 * near * far) / (far + near - (2.0 * depth_buffer - 1.0) * (far - near))
+
     
     if stereo:
         cam2_2_cam1 = np.identity(4)

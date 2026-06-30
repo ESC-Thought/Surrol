@@ -117,3 +117,14 @@ register(
     entry_point='surrol.tasks.ecm_active_track:ActiveTrack',
     max_episode_steps=500,
 )
+register(
+    id='PegBlockPick-v0',
+    entry_point='surrol.tasks.peg_block_pick:PegBlockPick',
+    max_episode_steps=50,
+)
+
+register(
+    id='PegBlockPickPsm2-v0',
+    entry_point='surrol.tasks.peg_block_pick_psm2:PegBlockPickPsm2',
+    max_episode_steps=50,
+)

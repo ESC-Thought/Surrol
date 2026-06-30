@@ -1,8 +1,8 @@
-name: surrol_bipegtransfer_dp3_pointcloud
+name: surrol_bipegtransfer_dp3_global_pointcloud
 task_name: bipeg_transfer
 
 data:
-  path: collected_data/bipeg_transfer_dp3_pointcloud.npz
+  path: collected_data/bipeg_transfer_dp3_global_fixedpeg_xyjitter_pointcloud.npz
   obs_horizon: 2
   action_horizon: 16
   val_ratio: 0.2
@@ -47,4 +47,9 @@ eval:
   action_mode: absolute
   point_cloud_frame: camera
   num_points: 1024
-  mask_mode: target
+  mask_mode: all
+  point_noise_std: 0.001
+  point_noise_clip: 0.003
+  randomize_block_initial_position: false
+  block_initial_peg_indices: [6]
+  block_initial_xy_jitter: 0.002

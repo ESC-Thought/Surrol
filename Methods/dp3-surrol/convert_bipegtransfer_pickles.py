@@ -16,11 +16,17 @@ import numpy as np
 
 SCRIPT_PATH = Path(__file__).resolve()
 REPO_ROOT = SCRIPT_PATH.parents[2]
-DEFAULT_INPUT_DIR = REPO_ROOT / "collected_data/bipeg_transfer"
-DEFAULT_OUTPUT_PATH = REPO_ROOT / "collected_data/bipeg_transfer_dp3_pointcloud.npz"
+DEFAULT_INPUT_DIR = REPO_ROOT / "collected_data/peg_block_pick_psm2_cropped_v3"
+DEFAULT_NUM_POINTS = 1024
+DEFAULT_OUTPUT_PATH = REPO_ROOT / "collected_data/peg_block_pick_psm2_cropped_v3_pointcloud.npz"
 DEFAULT_IMAGE_WIDTH = 256
 DEFAULT_IMAGE_HEIGHT = 256
-DEFAULT_FOV_DEG = 60.0
+DEFAULT_FOV_DEG = 25
+DEFAULT_MASK_MODE = "target"
+DEFAULT_POINT_NOISE_STD = 0.0
+DEFAULT_POINT_NOISE_CLIP = 0.0
+DEFAULT_DEPTH_NOISE_STD = 0.0
+DEFAULT_DEPTH_NOISE_CLIP = 0.0
 
 
 def parse_args() -> argparse.Namespace:
@@ -30,8 +36,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--input-dir", type=Path, default=DEFAULT_INPUT_DIR)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT_PATH)
     parser.add_argument("--output-format", choices=("npz", "zarr", "episode_npz"), default=None)
-    parser.add_argument("--num-points", type=int, default=1024)
-    parser.add_argument("--mask-mode", choices=("target", "no_arm", "all"), default="target")
+    parser.add_argument("--num-points", type=int, default=DEFAULT_NUM_POINTS)
+    parser.add_argument("--mask-mode", choices=("target", "no_arm", "all"), default=DEFAULT_MASK_MODE)
     parser.add_argument("--action-mode", choices=("absolute", "dq"), default="absolute")
     parser.add_argument("--waypoints", default="all", help="Use 'all' or a comma list such as 0,1,2.")
     parser.add_argument("--episode-limit", "--max-episodes", type=int, default=None)
@@ -39,6 +45,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--fov-deg", type=float, default=DEFAULT_FOV_DEG)
     parser.add_argument("--image-width", type=int, default=DEFAULT_IMAGE_WIDTH)
     parser.add_argument("--image-height", type=int, default=DEFAULT_IMAGE_HEIGHT)
+    parser.add_argument("--point-noise-std", type=float, default=DEFAULT_POINT_NOISE_STD)
+    parser.add_argument("--point-noise-clip", type=float, default=DEFAULT_POINT_NOISE_CLIP)
+    parser.add_argument("--depth-noise-std", type=float, default=DEFAULT_DEPTH_NOISE_STD)
+    parser.add_argument("--depth-noise-clip", type=float, default=DEFAULT_DEPTH_NOISE_CLIP)
     parser.add_argument("--include-rgb", action="store_true")
     return parser.parse_args()
 
@@ -166,6 +176,42 @@ def sample_points(
     return points[sampled_indices], colors[sampled_indices]
 
 
+def add_point_noise(
+    points: np.ndarray,
+    noise_std: float,
+    noise_clip: float,
+    random_generator: np.random.Generator,
+) -> np.ndarray:
+    if noise_std <= 0.0:
+        return points.astype(np.float32, copy=False)
+    noise = random_generator.normal(0.0, noise_std, size=points.shape).astype(np.float32)
+    if noise_clip > 0.0:
+        noise = np.clip(noise, -noise_clip, noise_clip)
+    return (points + noise).astype(np.float32)
+
+
+def add_depth_noise(
+    depth_image: np.ndarray,
+    noise_std: float,
+    noise_clip: float,
+    random_generator: np.random.Generator,
+) -> np.ndarray:
+    if noise_std <= 0.0:
+        return depth_image.astype(np.float32, copy=False)
+
+    noisy_depth = depth_image.astype(np.float32, copy=True)
+    valid_mask = np.isfinite(noisy_depth) & (noisy_depth > 0.0)
+    if not np.any(valid_mask):
+        return noisy_depth
+
+    noise = random_generator.normal(0.0, noise_std, size=noisy_depth.shape).astype(np.float32)
+    if noise_clip > 0.0:
+        noise = np.clip(noise, -noise_clip, noise_clip)
+
+    noisy_depth[valid_mask] = np.maximum(noisy_depth[valid_mask] + noise[valid_mask], 1e-6)
+    return noisy_depth
+
+
 def required_frame_count(data: Dict[str, Any], waypoint: str, action_key: str) -> int:
     required_sequences = [
         data["images"][waypoint],
@@ -207,6 +253,12 @@ def build_pointcloud_dataset(args: argparse.Namespace) -> Tuple[Dict[str, np.nda
                 rgb_pair = data["images"][waypoint][frame_index]
                 rgb_image = np.asarray(rgb_pair[0], dtype=np.uint8)
                 depth_image = np.asarray(data["depths"][waypoint][frame_index], dtype=np.float32)
+                depth_image = add_depth_noise(
+                    depth_image=depth_image,
+                    noise_std=args.depth_noise_std,
+                    noise_clip=args.depth_noise_clip,
+                    random_generator=random_generator,
+                )
                 mask_image = get_mask(data, waypoint, frame_index, args.mask_mode)
 
                 points, colors = depth_to_camera_points(
@@ -219,6 +271,12 @@ def build_pointcloud_dataset(args: argparse.Namespace) -> Tuple[Dict[str, np.nda
                     points=points,
                     colors=colors,
                     num_points=args.num_points,
+                    random_generator=random_generator,
+                )
+                sampled_points = add_point_noise(
+                    points=sampled_points,
+                    noise_std=args.point_noise_std,
+                    noise_clip=args.point_noise_clip,
                     random_generator=random_generator,
                 )
 
@@ -265,6 +323,10 @@ def build_pointcloud_dataset(args: argparse.Namespace) -> Tuple[Dict[str, np.nda
         "fov_deg": args.fov_deg,
         "camera_intrinsic": camera_intrinsic.tolist(),
         "includes_point_color": args.include_rgb,
+        "point_noise_std": args.point_noise_std,
+        "point_noise_clip": args.point_noise_clip,
+        "depth_noise_std": args.depth_noise_std,
+        "depth_noise_clip": args.depth_noise_clip,
     }
     return dataset, metadata
 

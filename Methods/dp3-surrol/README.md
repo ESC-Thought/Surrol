@@ -25,7 +25,7 @@ MODEL_SIZE=tiny TRAIN_EPOCHS=50 BATCH_SIZE=8 EVAL_EPISODES=20 MAX_STEPS=200 \
 
 Important knobs:
 
-- `DATA_NPZ`: point-cloud dataset, default `collected_data/bipeg_transfer_dp3_pointcloud.npz`.
+- `DATA_NPZ`: point-cloud dataset, default `collected_data/bipeg_transfer_dp3_global_fixedpeg_xyjitter_pointcloud.npz`.
 - `RUN_CONVERT=True`: force pickle-to-NPZ conversion before training.
 - `MODEL_SIZE=tiny|small|base`: select the DP3 model size.
 - `DEVICE=cpu` or `DEVICE=cuda:0`: override auto device detection.
@@ -60,9 +60,9 @@ From the repository root, or from this `Methods/dp3-surrol` folder:
 ```bash
 python3 Methods/dp3-surrol/convert_bipegtransfer_pickles.py \
   --input-dir collected_data/bipeg_transfer \
-  --output collected_data/bipeg_transfer_dp3_pointcloud.npz \
+  --output collected_data/bipeg_transfer_dp3_global_fixedpeg_xyjitter_pointcloud.npz \
   --num-points 1024 \
-  --mask-mode target \
+  --mask-mode all \
   --action-mode absolute
 ```
 
@@ -77,7 +77,7 @@ python3 Methods/dp3-surrol/convert_bipegtransfer_pickles.py --mask-mode all
 
 # Emit a DP3-style zarr tree if zarr is installed.
 python3 Methods/dp3-surrol/convert_bipegtransfer_pickles.py \
-  --output collected_data/bipeg_transfer_dp3_pointcloud.zarr \
+  --output collected_data/bipeg_transfer_dp3_global_fixedpeg_xyjitter_pointcloud.zarr \
   --output-format zarr
 
 # Emit one npz file per source episode.
@@ -108,8 +108,8 @@ episode.
 
 ```bash
 python3 Methods/dp3-surrol/visualize_pointcloud_npz.py \
-  --input collected_data/bipeg_transfer_dp3_pointcloud.npz \
-  --output collected_data/bipeg_transfer_dp3_pointcloud_preview.png \
+  --input collected_data/bipeg_transfer_dp3_global_fixedpeg_xyjitter_pointcloud.npz \
+  --output collected_data/bipeg_transfer_dp3_global_fixedpeg_xyjitter_pointcloud_preview.png \
   --episode 0 \
   --num-frames 5
 ```
@@ -124,8 +124,8 @@ a human-upright display without modifying the `.npz` data.
 
 ```bash
 python3 Methods/dp3-surrol/video_pointcloud_npz.py \
-  --input collected_data/bipeg_transfer_dp3_pointcloud.npz \
-  --output collected_data/bipeg_transfer_dp3_pointcloud_episode0.mp4 \
+  --input collected_data/bipeg_transfer_dp3_global_fixedpeg_xyjitter_pointcloud.npz \
+  --output collected_data/bipeg_transfer_dp3_global_fixedpeg_xyjitter_pointcloud_episode0.mp4 \
   --episode 0 \
   --fps 12
 ```
@@ -140,7 +140,7 @@ typical plotting/world-style coordinate view.
 
 ```bash
 python3 Methods/dp3-surrol/inspect_dataset_batch.py \
-  --data collected_data/bipeg_transfer_dp3_pointcloud.npz \
+  --data collected_data/bipeg_transfer_dp3_global_fixedpeg_xyjitter_pointcloud.npz \
   --split both \
   --batch-size 4 \
   --obs-horizon 2 \
@@ -175,7 +175,7 @@ bash Methods/dp3-surrol/3D-Diffusion-Policy/scripts/train_surrol_bipeg_transfer_
 
 This launches `dp3.yaml` with `task=surrol_bipeg_transfer`, disabled WandB mode,
 small debug batch size, and the NPZ dataset at
-`collected_data/bipeg_transfer_dp3_pointcloud.npz`. The script defaults to a
+`collected_data/bipeg_transfer_dp3_global_fixedpeg_xyjitter_pointcloud.npz`. The script defaults to a
 tiny DP3 model to make the first SurRoL experiments practical:
 
 - `MODEL_SIZE=tiny`: overrides `down_dims=[128,256,512]`,

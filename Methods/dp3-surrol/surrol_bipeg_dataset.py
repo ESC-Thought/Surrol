@@ -15,7 +15,8 @@ from torch.utils.data import Dataset
 
 SCRIPT_PATH = Path(__file__).resolve()
 REPO_ROOT = SCRIPT_PATH.parents[2]
-DEFAULT_DATA_PATH = REPO_ROOT / "collected_data/bipeg_transfer_dp3_pointcloud.npz"
+DEFAULT_NUM_POINTS = 1024
+DEFAULT_DATA_PATH = REPO_ROOT / "collected_data/bipeg_transfer_dp3_global_fixedpeg_xyjitter_pointcloud.npz"
 
 SplitName = Literal["train", "val", "all"]
 Normalizer = Dict[str, Dict[str, np.ndarray]]
@@ -50,6 +51,8 @@ def resolve_path(path: Path) -> Path:
 def parse_metadata(raw_metadata: object) -> Dict[str, object]:
     if raw_metadata is None:
         return {}
+    if isinstance(raw_metadata, np.ndarray):
+        raw_metadata = raw_metadata.item()
     try:
         return json.loads(str(raw_metadata))
     except json.JSONDecodeError:
@@ -97,6 +100,25 @@ def compute_mean_std(values: np.ndarray, axes: Tuple[int, ...], eps: float) -> D
     return {"mean": mean, "std": std}
 
 
+def validate_num_points(point_cloud: np.ndarray, expected_num_points: Optional[int], data_path: Path, metadata: Dict[str, object]) -> None:
+    if point_cloud.ndim != 3:
+        raise ValueError(f"Expected point_cloud with shape (T, N, C), got {point_cloud.shape} from {data_path}.")
+    if expected_num_points is None:
+        return
+
+    expected_num_points = int(expected_num_points)
+    actual_num_points = int(point_cloud.shape[1])
+    if actual_num_points != expected_num_points:
+        metadata_points = metadata.get("num_points", "unknown")
+        raise ValueError(
+            f"SurRoL BiPegTransfer point-cloud count mismatch: loaded {actual_num_points} points "
+            f"per frame from {data_path}, but config expects {expected_num_points}. "
+            f"NPZ metadata num_points={metadata_points}. Regenerate/convert the dataset with "
+            f"--num-points {expected_num_points}, or pass --num-points {actual_num_points} if that "
+            "is the intended experiment."
+        )
+
+
 class SurrolBipegSequenceDataset(Dataset):
     def __init__(
         self,
@@ -112,6 +134,7 @@ class SurrolBipegSequenceDataset(Dataset):
         include_rgb: bool = False,
         return_info: bool = False,
         eps: float = 1e-6,
+        num_points: Optional[int] = DEFAULT_NUM_POINTS,
     ) -> None:
         if obs_horizon <= 0:
             raise ValueError("obs_horizon must be positive.")
@@ -133,6 +156,7 @@ class SurrolBipegSequenceDataset(Dataset):
         self.return_info = return_info
         self.include_rgb = include_rgb
         self.eps = eps
+        self.num_points = num_points
 
         with np.load(self.data_path, allow_pickle=False) as data:
             self.point_cloud = data["point_cloud"].astype(np.float32, copy=False)
@@ -146,6 +170,13 @@ class SurrolBipegSequenceDataset(Dataset):
                     raise KeyError("include_rgb=True requires point_color in the NPZ.")
                 point_color = data["point_color"].astype(np.float32, copy=False)
                 self.point_cloud = np.concatenate([self.point_cloud, point_color], axis=-1)
+
+        validate_num_points(
+            point_cloud=self.point_cloud,
+            expected_num_points=self.num_points,
+            data_path=self.data_path,
+            metadata=self.metadata,
+        )
 
         if self.point_cloud.shape[0] != self.action.shape[0] or self.action.shape[0] != self.agent_pos.shape[0]:
             raise ValueError("point_cloud, action, and agent_pos must have the same first dimension.")
@@ -267,6 +298,7 @@ class SurrolBipegSequenceDataset(Dataset):
             "num_samples": len(self),
             "obs_horizon": self.obs_horizon,
             "action_horizon": self.action_horizon,
+            "num_points": self.num_points,
             "point_cloud_shape": tuple(self.point_cloud.shape[1:]),
             "agent_pos_shape": tuple(self.agent_pos.shape[1:]),
             "action_shape": tuple(self.action.shape[1:]),
@@ -285,6 +317,7 @@ def make_train_val_datasets(
     normalize: bool = False,
     include_rgb: bool = False,
     return_info: bool = False,
+    num_points: Optional[int] = DEFAULT_NUM_POINTS,
 ) -> Tuple[SurrolBipegSequenceDataset, SurrolBipegSequenceDataset]:
     train_dataset = SurrolBipegSequenceDataset(
         data_path=data_path,
@@ -297,6 +330,7 @@ def make_train_val_datasets(
         normalize=False,
         include_rgb=include_rgb,
         return_info=return_info,
+        num_points=num_points,
     )
     shared_normalizer = train_dataset.get_normalizer()
     train_dataset.normalize = normalize
@@ -312,5 +346,6 @@ def make_train_val_datasets(
         normalizer=shared_normalizer,
         include_rgb=include_rgb,
         return_info=return_info,
+        num_points=num_points,
     )
     return train_dataset, val_dataset

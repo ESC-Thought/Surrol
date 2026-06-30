@@ -21,8 +21,9 @@ import numpy as np
 
 SCRIPT_PATH = Path(__file__).resolve()
 REPO_ROOT = SCRIPT_PATH.parents[2]
-DEFAULT_INPUT_PATH = REPO_ROOT / "collected_data/bipeg_transfer_dp3_pointcloud.npz"
-DEFAULT_OUTPUT_PATH = REPO_ROOT / "collected_data/bipeg_transfer_dp3_pointcloud_episode0.mp4"
+DEFAULT_NUM_POINTS = 1024
+DEFAULT_INPUT_PATH = REPO_ROOT / "collected_data/peg_block_pick_psm2_cropped_v3_pointcloud.npz"
+DEFAULT_OUTPUT_PATH = REPO_ROOT / "collected_data/peg_block_pick_psm2_cropped_v3_pointcloud.mp4"
 
 
 def parse_args() -> argparse.Namespace:
@@ -34,7 +35,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--end-frame", type=int, default=None, help="Exclusive frame index inside the episode.")
     parser.add_argument("--stride", type=int, default=1)
     parser.add_argument("--max-frames", type=int, default=None, help="Uniformly subsample to at most this many frames.")
-    parser.add_argument("--max-points", type=int, default=1024)
+    parser.add_argument("--max-points", type=int, default=DEFAULT_NUM_POINTS)
     parser.add_argument("--point-size", type=float, default=3.0)
     parser.add_argument("--fps", type=int, default=12)
     parser.add_argument("--dpi", type=int, default=120)
